@@ -1,0 +1,94 @@
+#!/usr/bin/python
+
+# From http://superuser.com/a/557477/62132
+
+from __future__ import print_function
+
+OVA = "/home/phihag/div/isos/debian.ova" # Change this to the name of your ova file
+
+import io
+import optparse
+import os.path
+import random
+import re
+import subprocess
+import sys
+import time
+
+def wait(seconds=10):
+    for i in reversed(range(seconds)):
+        sys.stdout.write(str(i+1) + ' ')
+        sys.stdout.flush()
+        time.sleep(1)
+    sys.stdout.write('0')
+    sys.stdout.write('\n')
+
+def is_vm_running(vm_name):
+    vminfo = subprocess.check_output(['VBoxManage', 'showvminfo', vm_name])
+    state = re.search(r'\nState:\s*(.+?)\n', vminfo)
+    assert state
+    return not state.group(1).startswith('powered off')
+
+def delete_vm(vm_name):
+    if is_vm_running(vm_name):
+        subprocess.check_call(['VBoxManage', '-q', 'controlvm', vm_name, 'poweroff'])
+    vminfo = subprocess.check_output(['VBoxManage', 'showvminfo', vm_name])
+    for m in re.finditer(r'(?P<controller>(?:IDE|SATA) Controller)[ \t]+\((?P<port>[0-9]+), *(?P<device>[0-9]+)\):[\t ]+(?P<location>[a-z0-9A-Z/_\-\t \.]+)[ \t]+\(UUID:\s+[a-z0-9A-Z/_-](?P<uuid>[0-9a-f-]+)\)', vminfo):
+        hdd = m.groupdict()
+
+        cmd = ['VBoxManage', '-q', 'storageattach', vm_name, '--storagectl', hdd['controller'], '--port', hdd['port'], '--device', hdd['device'], '--medium', 'none']
+        subprocess.check_call(cmd)
+
+        # Delete hdd file
+        cmd = ['VBoxManage', '-q', 'closemedium', 'disk', hdd['location'], '--delete']
+        subprocess.check_call(cmd)
+    subprocess.check_call(['VBoxManage', '-q', 'unregistervm', vm_name, '--delete'])
+
+def main():
+    parser = optparse.OptionParser()
+    parser.add_option('-D', '--dont-start', dest='start', action='store_false', default=True, help="Don't start the VM automatically")
+    parser.add_option('-s', '--ssh-in', dest='ssh_in', action='store_true', help='Log in to the VM via ssh (i.e. start it headless)')
+    parser.add_option('-r', '--ssh-host-entry', dest='ssh_host_entry', action='store_true', help='Record the host in ~/.ssh/known_hosts')
+    parser.add_option('-o', '--once', dest='once', action='store_true', help='Terminate VM after logging out (implies -s)')
+    opts,args = parser.parse_args()
+
+    if args:
+        parser.error('Did not expect any arguments')
+    if opts.once:
+        opts.ssh_in = True
+
+    output = subprocess.check_output(['VBoxManage', 'import', OVA])
+    m = re.search(r'Suggested VM name "([^"]+)"', output)
+    if not m:
+        raise ValueError('Cannot parse output')
+    vm_name = m.group(1)
+    ssh_port = random.randint(1025, 65535)
+    subprocess.check_output(['VBoxManage', 'modifyvm', vm_name, '--natpf1', 'ssh,tcp,127.0.0.1,%s,,22' % ssh_port])
+    ssh_host = ['-p', str(ssh_port), 'localhost']
+    if opts.ssh_host_entry:
+        with io.open(os.path.expanduser('~/.ssh/config'), 'a', encoding='utf-8') as sshf:
+            sshf.write(u"\nHost vbox-%s\n\tHostName localhost\n\tPort %s\n" % (vm_name, ssh_port))
+        ssh_host = ['vbox-%s' % vm_name]
+
+    if opts.start:
+        headless = opts.ssh_in
+        cmd = ['VBoxManage', '-q', 'startvm'] + (['--type', 'headless'] if headless else []) + [vm_name]
+        subprocess.check_call(cmd)
+        if opts.ssh_in:
+            print('Waiting for VM to start')
+            wait(5)
+            subprocess.call(['ssh'] + ssh_host)
+            if opts.once:
+                print('Killing machine ' + vm_name + ' ...')
+                print('Press Ctrl+C to abort')
+                sys.stdout.flush()
+                wait(10)
+                delete_vm(vm_name)
+        else:
+            print('To log in, type   ssh ' + ' '.join(ssh_host))
+    else:
+        print('To start the created VM, type   VBoxManage startvm ' + vm_name)
+
+
+if __name__ == '__main__':
+    main()
