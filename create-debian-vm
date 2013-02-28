@@ -67,7 +67,7 @@ def main():
     ssh_host = ['-p', str(ssh_port), 'localhost']
     if opts.ssh_host_entry:
         with io.open(os.path.expanduser('~/.ssh/config'), 'a', encoding='utf-8') as sshf:
-            sshf.write(u"\nHost vbox-%s\n\tHostName localhost\n\tPort %s\n" % (vm_name, ssh_port))
+            sshf.write(u"\nHost vbox-%s\n\tHostName localhost\n\tPort %s\n\tStrictHostKeyChecking no\n" % (vm_name, ssh_port))
         ssh_host = ['vbox-%s' % vm_name]
 
     if opts.start:
@@ -77,7 +77,7 @@ def main():
         if opts.ssh_in:
             print('Waiting for VM to start')
             wait(5)
-            subprocess.call(['ssh'] + ssh_host)
+            subprocess.call(['ssh', '-oStrictHostKeyChecking=no'] + ssh_host)
             if opts.once:
                 print('Killing machine ' + vm_name + ' ...')
                 print('Press Ctrl+C to abort')
