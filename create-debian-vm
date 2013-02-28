@@ -76,7 +76,7 @@ def main():
         subprocess.check_call(cmd)
         if opts.ssh_in:
             print('Waiting for VM to start')
-            wait(5)
+            time.sleep(5)
             subprocess.call(['ssh', '-oStrictHostKeyChecking=no'] + ssh_host)
             if opts.once:
                 print('Killing machine ' + vm_name + ' ...')
