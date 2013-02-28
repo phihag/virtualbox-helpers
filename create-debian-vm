@@ -81,8 +81,7 @@ def main():
             if opts.once:
                 print('Killing machine ' + vm_name + ' ...')
                 print('Press Ctrl+C to abort')
-                sys.stdout.flush()
-                wait(10)
+                wait(5)
                 delete_vm(vm_name)
         else:
             print('To log in, type   ssh ' + ' '.join(ssh_host))
