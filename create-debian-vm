@@ -24,7 +24,7 @@ def wait(seconds=10):
     sys.stdout.write('\n')
 
 def is_vm_running(vm_name):
-    vminfo = subprocess.check_output(['VBoxManage', 'showvminfo', vm_name])
+    vminfo = subprocess.check_output(['VBoxManage', 'showvminfo', vm_name]).decode()
     state = re.search(r'\nState:\s*(.+?)\n', vminfo)
     assert state
     return not state.group(1).startswith('powered off')
@@ -32,7 +32,7 @@ def is_vm_running(vm_name):
 def delete_vm(vm_name):
     if is_vm_running(vm_name):
         subprocess.check_call(['VBoxManage', '-q', 'controlvm', vm_name, 'poweroff'])
-    vminfo = subprocess.check_output(['VBoxManage', 'showvminfo', vm_name])
+    vminfo = subprocess.check_output(['VBoxManage', 'showvminfo', vm_name]).decode()
     for m in re.finditer(r'(?P<controller>(?:IDE|SATA) Controller)[ \t]+\((?P<port>[0-9]+), *(?P<device>[0-9]+)\):[\t ]+(?P<location>[a-z0-9A-Z/_\-\t \.]+)[ \t]+\(UUID:\s+[a-z0-9A-Z/_-](?P<uuid>[0-9a-f-]+)\)', vminfo):
         hdd = m.groupdict()
 
@@ -57,7 +57,7 @@ def main():
     if opts.once:
         opts.ssh_in = True
 
-    output = subprocess.check_output(['VBoxManage', 'import', OVA])
+    output = subprocess.check_output(['VBoxManage', 'import', OVA]).decode()
     m = re.search(r'Suggested VM name "([^"]+)"', output)
     if not m:
         raise ValueError('Cannot parse output')
