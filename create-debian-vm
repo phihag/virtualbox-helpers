@@ -74,17 +74,18 @@ def main():
         headless = opts.ssh_in
         cmd = ['VBoxManage', '-q', 'startvm'] + (['--type', 'headless'] if headless else []) + [vm_name]
         subprocess.check_call(cmd)
+        ssh_cmd = ['ssh', '-oStrictHostKeyChecking=no'] + ssh_host
         if opts.ssh_in:
             print('Waiting for VM to start')
             time.sleep(5)
-            subprocess.call(['ssh', '-oStrictHostKeyChecking=no'] + ssh_host)
+            subprocess.call(ssh_cmd)
             if opts.once:
                 print('Killing machine ' + vm_name + ' ...')
                 print('Press Ctrl+C to abort')
                 wait(5)
                 delete_vm(vm_name)
         else:
-            print('To log in, type   ssh ' + ' '.join(ssh_host))
+            print('To log in, type   ' + ' '.join(ssh_cmd))
     else:
         print('To start the created VM, type   VBoxManage startvm ' + vm_name)
 
